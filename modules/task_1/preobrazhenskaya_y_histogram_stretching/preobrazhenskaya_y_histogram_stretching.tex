@@ -1,0 +1,1180 @@
+\documentclass{report}
+
+\usepackage[warn]{mathtext}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{luainputenc}
+\usepackage[english, russian]{babel}
+\usepackage[pdftex]{hyperref}
+\usepackage{tempora}
+\usepackage[12pt]{extsizes}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+
+\geometry{a4paper,top=2cm,bottom=2cm,left=2.5cm,right=1.5cm}
+\setlength{\parskip}{0.5cm}
+\setlist{nolistsep, itemsep=0.3cm,parsep=0pt}
+
+\usepackage{listings}
+\lstset{language=C++,
+        basicstyle=\footnotesize,
+		keywordstyle=\color{blue}\ttfamily,
+		stringstyle=\color{red}\ttfamily,
+		commentstyle=\color{green}\ttfamily,
+		morecomment=[l][\color{red}]{\#}, 
+		tabsize=4,
+		breaklines=true,
+  		breakatwhitespace=true,
+  		title=\lstname,       
+}
+
+\makeatletter
+\renewcommand\@biblabel[1]{#1.\hfil}
+\makeatother
+
+\begin{document}
+
+\begin{titlepage}
+
+\begin{center}
+Министерство науки и высшего образования Российской Федерации
+\end{center}
+
+\begin{center}
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского
+\end{center}
+
+\begin{center}
+Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4em}
+
+\begin{center}
+\textbf{\LargeОтчет по лабораторной работе} \\
+\end{center}
+\begin{center}
+\textbf{\Large«Повышение контраста полутонового изображения посредством линейной растяжки гистограммы»} \\
+\end{center}
+
+\vspace{4em}
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{text}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{7cm}{
+\hspace*{5cm}\hspace*{-5cm}\textbf{Выполнила:} \\ студентка группы 381906-2 \\ Преображенская Ю. Д.\\
+\\
+\hspace*{5cm}\hspace*{-5cm}\textbf{Проверил:}\\ доцент кафедры МОСТ, \\ кандидат технических наук \\ Сысоев А. В.\\
+}
+\vspace{\fill}
+
+\begin{center} Нижний Новгород \\ 2022 \end{center}
+
+\end{titlepage}
+
+\setcounter{page}{2}
+
+% Содержание
+\tableofcontents
+\newpage
+
+% Введение
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+\par Контраст - это разница в яркости, которая делает объект на изображении отличимым от других объектов в том же поле зрения. Наиболее часто встречающимся дефектом изображений является слабый контраст, обусловленный ограниченностью диапазона воспроизводимых яркостей. Повысить контраст можно с помощью цифровой обработки изображения, заключающейся в изменении яркости каждого элемента изображения и увеличении диапазона яркостей до максимального интервала от 0 до 255. Одним из самых распространенных методов повышения контраста является метод линейной растяжки гистограммы. Гистограмма - это график распределения яркости изображения. Под линейной растяжкой гистограммы понимается компенсация узкого диапазона яркостей посредством присвоения пикселям новых значений яркости по определенной формуле.
+\newpage
+
+% Постановка задачи
+\section*{Постановка задачи}
+\addcontentsline{toc}{section}{Постановка задачи}
+\par В данном лабораторной работе требуется реализовать последовательную версию и параллельные версии алгоритма линейной растяжки гистограммы, провести вычислительные эксперименты для сравнения времени работы алгоритмов, используя при этом фрэймворк для разработки автоматических тестов Google Test, продемонстрировать работу алгоритмов на реальных изображениях, сделать выводы об эффективности реализованных алгоритмов.
+\par Параллельные алгоритмы должны быть реализованы при помощи технологий OpenMP, TBB, std::thread.
+\newpage
+
+% Описание алгоритма
+\section*{Описание алгоритма}
+\addcontentsline{toc}{section}{Описание алгоритма}
+\par Алгоритм линейной растяжки гистограммы состоит из следующих шагов:
+\begin{enumerate}
+\item Поиск минимального ($y_{min}$) и максимального ($y_{max}$) значений яркости изображения.
+\item Присвоение новых значений яркости каждому пикселю по формуле: $$x = f^{-1}(y) = (y - y_{min}) * \frac{(255 - 0)}{(y_{max} - y_{min})},$$
+где $y$ - яркость пикселя на исходном изображении, $x$ - яркость пикселя после коррекции.
+\end{enumerate}
+\newpage
+
+% Описание схемы распараллеливания
+\section*{Описание схемы распараллеливания}
+\addcontentsline{toc}{section}{Описание схемы распараллеливания}
+\par Распараллеливание происходит с помощью разбиения данных (т.е. массива пикселей) на блоки и распределения их между потоками. Каждый создаваемый поток обрабатывает только отданную ему часть массива. Под обработкой понимается применение формулы линейной растяжки гистограммы, приведенной в разделе выше. В OpenMP и TBB версиях распределение данных осуществляется автоматически. В std::thread версии количество данных, обрабатываемое каждым потоком, определяется по формуле $\frac{\text{число пикселей}}{\text{число потоков}}$. При выходе из параллельного региона во всех параллельных версиях используется автоматическая синхронизация.
+
+\newpage
+
+% Описание программной реализации
+\section*{Описание программной реализации}
+\addcontentsline{toc}{section}{Описание программной реализации}
+Программа состоит из заголовочного файла histogram\_stretching.h и двух файлов исходного кода histogram\_stretching.cpp и main.cpp.
+\par В заголовочном файле находятся прототипы функций для последовательного и параллельных алгоритмов линейной растяжки гистограммы.
+\par Функция для представления изображения:
+\begin{lstlisting}
+int* getRandomImage(int height, int width);
+\end{lstlisting}
+Первый параметр функции является высотой изображения, второй параметр - ширина изображения.
+\par Функции для поиска максимального и минимального значений пикселя:
+\begin{lstlisting}
+int getYmax(int* image, int height, int width);
+\end{lstlisting}
+\begin{lstlisting}
+int getYmin(int* image, int height, int width);
+\end{lstlisting}
+Первый параметр функций является массивом пикселей изображения, второй параметр - высота изображения, третий - ширина изображения.
+\par Функция для последовательного алгоритма:
+\begin{lstlisting}
+int* getSequentialOperations(int* image, int height, int width, int y_max, int y_min);
+\end{lstlisting}
+Первый параметр функции является массивом пикселей изображения, второй параметр - высота изображения, третий - ширина изображения, четвертый и пятый - максимальное и минимальное значение яркости пикселей.
+\par Функция для параллельного алгоритма (OpenMP версия):
+\begin{lstlisting}
+int* getParallelOperationsOMP(int* image, int height, int width, int y_max, int y_min);
+\end{lstlisting}
+\par Функция для параллельного алгоритма (TBB версия):
+\begin{lstlisting}
+int* getParallelOperationsTBB(int* image, int height, int width, int y_max, int y_min);
+\end{lstlisting}
+\par Функция для параллельного алгоритма (std::thread версия):
+\begin{lstlisting}
+int* getParallelOperationsSTD(int* image, int height, int width, int y_max, int y_min);
+\end{lstlisting}
+Входные параметры параллельных функций совпадают с входными параметрами функции для последовательного алгоритма.
+\par В файле исходного кода histogram\_stretching.cpp содержится реализация функций, объявленных в заголовочном файле. В файле исходного кода main.cpp содержатся тесты для проверки корректности программы.
+\newpage
+
+% Подтверждение корректности
+\section*{Подтверждение корректности}
+\addcontentsline{toc}{section}{Подтверждение корректности}
+Для подтверждения корректности работы данной программы с помощью фрэймфорка Google Test мной было разработано 6 тестов для каждой версии алгоритма. В каждом из тестов для каждой из версий осуществляется линейная растяжка гистограммы при помощи последовательного алгоритма и рассматриваемого параллельного алгоритма, подсчитывается время работы обоих алгоритмов, находится ускорение и затем результаты, полученные последовательным и параллельным способом сравниваются между собой.
+\par Помимо модульных тестов, мной были проведены тесты на реальных изображениях. Визуализация осуществлялась с помощью средств библиотеки OpenCV. Всеми алгоритмами были достигнуты правильные результаты коррекции изображений.
+\par Успешное прохождение всех тестов подтверждает корректность работы программы.
+\newpage
+
+% Результаты экспериментов
+\section*{Результаты экспериментов}
+\addcontentsline{toc}{section}{Результаты экспериментов}
+Вычислительные эксперименты для оценки эффективности работы параллельных алгоритмов проводились на ПК со следующими характеристиками:
+\begin{itemize}
+\item Процессор: AMD Ryzen 5 4500U, 2.3 ГГц (4.0 ГГц, в режиме Turbo), количество ядер: 6;
+\item Оперативная память: 8 ГБ (DDR4), 3200 МГц;
+\item Операционная система: Windows 10 Home.
+\end{itemize}
+
+\par Эксперименты проводились на 6 потоках. Размер первого изображения равен 575*771 пикселей. Размер второго изображения равен 4952*7444 пикселей.
+
+\par Результаты экспериментов представлены в Таблице 1 и в Таблице 2.
+\begin{table}[!h]
+\caption{Результаты вычислительных экспериментов с первым изображением}
+\centering
+\begin{tabular}{| p{2cm} | p{3cm} | p{4cm} | p{2cm} |}
+\hline
+Версия алгоритма & Время работы (в секундах) & Ускорение  \\[5pt]
+\hline
+Sequential        & 0.296875        & -         \\
+OpenMP        & 0.0503011        & 5.90196          \\
+TBB       & 0.0514206        & 5.77346         \\
+std::thread        & 0.0522585        & 5.68089           \\
+
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!h]
+\caption{Результаты вычислительных экспериментов со вторым изображением}
+\centering
+\begin{tabular}{| p{2cm} | p{3cm} | p{4cm} | p{2cm} |}
+\hline
+Версия алгоритма & Время работы (в секундах) & Ускорение  \\[5pt]
+\hline
+Sequential      & 24.7384       & -         \\
+OpenMP        & 4.17071        & 5.93147          \\
+TBB       & 4.17632       & 5.92349         \\
+std::thread        & 4.18915        & 5.90535          \\
+
+\hline
+\end{tabular}
+\end{table}
+
+\newpage
+
+% Выводы из результатов экспериментов
+\section*{Выводы из результатов экспериментов}
+\addcontentsline{toc}{section}{Выводы из результатов экспериментов}
+Из данных, полученных в результате экспериментов (см. Таблицу 1 и Таблицу 2), можно сделать вывод, что все параллельные версии работают намного быстрее, чем последовательная. Во всех случаях удается достичь ускорения более, чем в 5 раз (близкое к 6). Это говорит о том, что ускорение соразмерно количеству потоков, используемых в программе. Однако ускорения, равного числу потоков, достичь не удастся, поскольку создание потоков и распределение данных между ними приводит к увеличению времени работы параллельного алгоритма. Проанализировав полученные результаты, можно заметить, что OpenMP версия работает чуть быстрее TBB и std::thread версий.
+\newpage
+
+% Заключение
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+Таким образом, в рамках данной лабораторной работы были разработаны последовательный и параллельные алгоритмы повышения контраста полутонового изображения посредством линейной растяжки гистограммы. Проведенные тесты показали корректность реализованной программы, а проведенные эксперименты доказали эффективность параллельных алгоритмов по сравнению с последовательным.
+\newpage
+
+% Литература
+\section*{Литература}
+\addcontentsline{toc}{section}{Литература}
+\begin{enumerate}
+\item OpenCV - Электронный ресурс. URL: \newline \url{https://docs.opencv.org/3.4/d4/d1b/tutorial_histogram_equalization.html}
+\item ИНТУИТ - Электронный ресурс. URL: \newline \url{https://intuit.ru/studies/courses/10621/1105/lecture/17989?page=9}
+\item Habr - Электронный ресурс. URL: \newline \url{https://habr.com/ru/company/intel/blog/85273/}
+\item TheAILearner - Электронный ресурс. URL: \newline \url{https://theailearner.com/2019/01/30/contrast-stretching/}
+\item Е.В. Турлапов «Обработка изображений. Часть 1». URL: \newline \url{http://www.graph.unn.ru/rus/materials/CG/CG03_ImageProcessing.pdf}
+\item Educative - Электронный ресурс. URL: \newline \url{https://www.educative.io/blog/modern-multithreading-and-concurrency-in-cpp}
+\item А.В. Сысоев, И.Б. Мееров, А.А. Сиднев «Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks». Нижний Новгород, 2007, 128 с. 
+\item А.В. Сысоев, И.Б. Мееров, А.Н. Свистунов, А.Л. Курылев, А.В. Сенин, А.В. Шишков, К.В. Корняков, А.А. Сиднев «Параллельное программирование в системах с общей
+памятью. Инструментальная поддержка». Нижний Новгород, 2007, 110 с. 
+\end{enumerate} 
+\newpage
+
+% Приложение
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+\textbf{Последовательная версия}
+\newline
+\newline histogram\_stretching.h
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#ifndef MODULES_TASK_1_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+#define MODULES_TASK_1_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+int* getRandomImage(int height, int width);
+int getYmax(int* image, int height, int width);
+int getYmin(int* image, int height, int width);
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min);
+
+#endif  // MODULES_TASK_1_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+\end{lstlisting}
+histogram\_stretching.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <random>
+#include "../../../../task_1/preobrazhenskaya_y_histogram_stretching/histogram_stretching.h"
+
+int* getRandomImage(int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::random_device dev;
+    std::mt19937 gen(dev());
+    int* image = new int[height * width];
+    for (int i = 0; i < height * width; i++) { image[i] = gen() % 256; }
+    return image;
+}
+
+int getYmax(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_max = 0;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] > y_max) {
+            y_max = image[i];
+        }
+    }
+    return y_max;
+}
+
+int getYmin(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_min = 255;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] < y_min) {
+            y_min = image[i];
+        }
+    }
+    return y_min;
+}
+
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int* result_image = new int[height * width];
+    for (int i = 0; i < height * width; i++) {
+        result_image[i] = (image[i] - y_min) * ((255 - 0) / (y_max - y_min));
+        if (result_image[i] < 0) {
+            result_image[i] = 0;
+        }
+        if (result_image[i] > 255) {
+            result_image[i] = 255;
+        }
+    }
+    return result_image;
+}
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <gtest/gtest.h>
+#include "./histogram_stretching.h"
+
+TEST(Sequential_Histogram_Stretching, Image_is_empty) {
+    int height = 0;
+    int width = 0;
+    ASSERT_ANY_THROW(getRandomImage(height, width));
+}
+
+TEST(Sequential_Histogram_Stretching, Image_5x5) {
+    int height = 5;
+    int width = 5;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image = nullptr;
+    ASSERT_NO_THROW(result_image = getSequentialOperations(image, height, width,
+        y_max, y_min));
+    delete[] image;
+    delete[] result_image;
+}
+
+TEST(Sequential_Histogram_Stretching, Image_7x10) {
+    int height = 7;
+    int width = 10;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image = nullptr;
+    ASSERT_NO_THROW(result_image = getSequentialOperations(image, height, width,
+        y_max, y_min));
+    delete[] image;
+    delete[] result_image;
+}
+
+TEST(Sequential_Histogram_Stretching, Image_10x15) {
+    int height = 10;
+    int width = 15;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image = nullptr;
+    ASSERT_NO_THROW(result_image = getSequentialOperations(image, height, width,
+        y_max, y_min));
+    delete[] image;
+    delete[] result_image;
+}
+
+TEST(Sequential_Histogram_Stretching, Image_40x20) {
+    int height = 40;
+    int width = 20;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image = nullptr;
+    ASSERT_NO_THROW(result_image = getSequentialOperations(image, height, width,
+        y_max, y_min));
+    delete[] image;
+    delete[] result_image;
+}
+
+TEST(Sequential_Histogram_Stretching, Image_50x50) {
+    int height = 50;
+    int width = 50;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image = nullptr;
+    ASSERT_NO_THROW(result_image = getSequentialOperations(image, height, width,
+        y_max, y_min));
+    delete[] image;
+    delete[] result_image;
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+\end{lstlisting}
+
+\textbf{OpenMP версия}
+\newline
+\newline histogram\_stretching.h
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#ifndef MODULES_TASK_2_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+#define MODULES_TASK_2_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+#include <iostream>
+
+int* getRandomImage(int height, int width);
+int getYmax(int* image, int height, int width);
+int getYmin(int* image, int height, int width);
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min);
+int* getParallelOperationsOMP(int* image, int height, int width,
+    int y_max, int y_min);
+
+#endif  // MODULES_TASK_2_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+
+\end{lstlisting}
+histogram\_stretching.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <omp.h>
+#include <random>
+#include "../../../../task_2/preobrazhenskaya_y_histogram_stretching/histogram_stretching.h"
+
+int* getRandomImage(int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::random_device dev;
+    std::mt19937 gen(dev());
+    int* image = new int[height * width];
+    for (int i = 0; i < height * width; i++) { image[i] = gen() % 256; }
+    return image;
+}
+
+int getYmax(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_max = 0;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] > y_max) {
+            y_max = image[i];
+        }
+    }
+    return y_max;
+}
+
+int getYmin(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_min = 255;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] < y_min) {
+            y_min = image[i];
+        }
+    }
+    return y_min;
+}
+
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int* result_image = new int[height * width];
+    for (int i = 0; i < height * width; i++) {
+        result_image[i] = (image[i] - y_min) * ((255 - 0) / (y_max - y_min));
+        if (result_image[i] < 0) {
+            result_image[i] = 0;
+        }
+        if (result_image[i] > 255) {
+            result_image[i] = 255;
+        }
+    }
+    return result_image;
+}
+
+int* getParallelOperationsOMP(int* image, int height, int width,
+    int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int* result_image = new int[height * width];
+
+#pragma omp parallel for
+    for (int i = 0; i < height * width; i++) {
+        result_image[i] =
+            (image[i] - y_min) * ((255 - 0) / (y_max - y_min));
+        if (result_image[i] < 0) {
+            result_image[i] = 0;
+        }
+        if (result_image[i] > 255) {
+            result_image[i] = 255;
+        }
+    }
+    return result_image;
+}
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <omp.h>
+#include <gtest/gtest.h>
+#include "./histogram_stretching.h"
+
+TEST(OpenMP_Histogram_Stretching, Image_is_empty) {
+    int height = 0;
+    int width = 0;
+    ASSERT_ANY_THROW(getRandomImage(height, width));
+}
+
+TEST(OpenMP_Histogram_Stretching, Image_5x5) {
+    int height = 5;
+    int width = 5;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_omp = nullptr;
+    double start_seq = omp_get_wtime();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    double end_seq = omp_get_wtime();
+    double sequential_runtime = end_seq - start_seq;
+    double start_omp = omp_get_wtime();
+    result_image_omp = getParallelOperationsOMP(image, height, width,
+        y_max, y_min);
+    double end_omp = omp_get_wtime();
+    double parallel_omp_runtime = end_omp - start_omp;
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_omp_runtime=" << parallel_omp_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_omp[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_omp;
+}
+
+TEST(OpenMP_Histogram_Stretching, Image_7x10) {
+    int height = 7;
+    int width = 10;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_omp = nullptr;
+    double start_seq = omp_get_wtime();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    double end_seq = omp_get_wtime();
+    double sequential_runtime = end_seq - start_seq;
+    double start_omp = omp_get_wtime();
+    result_image_omp = getParallelOperationsOMP(image, height, width,
+        y_max, y_min);
+    double end_omp = omp_get_wtime();
+    double parallel_omp_runtime = end_omp - start_omp;
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_omp_runtime=" << parallel_omp_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_omp[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_omp;
+}
+
+TEST(OpenMP_Histogram_Stretching, Image_10x15) {
+    int height = 10;
+    int width = 15;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_omp = nullptr;
+    double start_seq = omp_get_wtime();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    double end_seq = omp_get_wtime();
+    double sequential_runtime = end_seq - start_seq;
+    double start_omp = omp_get_wtime();
+    result_image_omp = getParallelOperationsOMP(image, height, width,
+        y_max, y_min);
+    double end_omp = omp_get_wtime();
+    double parallel_omp_runtime = end_omp - start_omp;
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_omp_runtime=" << parallel_omp_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_omp[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_omp;
+}
+
+TEST(OpenMP_Histogram_Stretching, Image_40x20) {
+    int height = 40;
+    int width = 20;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_omp = nullptr;
+    double start_seq = omp_get_wtime();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    double end_seq = omp_get_wtime();
+    double sequential_runtime = end_seq - start_seq;
+    double start_omp = omp_get_wtime();
+    result_image_omp = getParallelOperationsOMP(image, height, width,
+        y_max, y_min);
+    double end_omp = omp_get_wtime();
+    double parallel_omp_runtime = end_omp - start_omp;
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_omp_runtime=" << parallel_omp_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_omp[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_omp;
+}
+
+TEST(OpenMP_Histogram_Stretching, Image_50x50) {
+    int height = 50;
+    int width = 50;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_omp = nullptr;
+    double start_seq = omp_get_wtime();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    double end_seq = omp_get_wtime();
+    double sequential_runtime = end_seq - start_seq;
+    double start_omp = omp_get_wtime();
+    result_image_omp = getParallelOperationsOMP(image, height, width,
+        y_max, y_min);
+    double end_omp = omp_get_wtime();
+    double parallel_omp_runtime = end_omp - start_omp;
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_omp_runtime=" << parallel_omp_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_omp[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_omp;
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    omp_set_num_threads(2);
+    return RUN_ALL_TESTS();
+}
+
+\end{lstlisting}
+
+\textbf{TBB версия}
+\newline
+\newline histogram\_stretching.h
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#ifndef MODULES_TASK_3_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+#define MODULES_TASK_3_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+#include <iostream>
+
+int* getRandomImage(int height, int width);
+int getYmax(int* image, int height, int width);
+int getYmin(int* image, int height, int width);
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min);
+int* getParallelOperationsTBB(int* image, int height, int width,
+    int y_max, int y_min);
+
+#endif  // MODULES_TASK_3_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+
+\end{lstlisting}
+histogram\_stretching.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <tbb/tbb.h>
+#include <random>
+#include "../../../../task_3/preobrazhenskaya_y_histogram_stretching/histogram_stretching.h"
+
+int* getRandomImage(int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::random_device dev;
+    std::mt19937 gen(dev());
+    int* image = new int[height * width];
+    for (int i = 0; i < height * width; i++) { image[i] = gen() % 256; }
+    return image;
+}
+
+int getYmax(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_max = 0;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] > y_max) {
+            y_max = image[i];
+        }
+    }
+    return y_max;
+}
+
+int getYmin(int* image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_min = 255;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] < y_min) {
+            y_min = image[i];
+        }
+    }
+    return y_min;
+}
+
+int* getSequentialOperations(int* image, int height, int width,
+    int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int* result_image = new int[height * width];
+    for (int i = 0; i < height * width; i++) {
+        result_image[i] = (image[i] - y_min) * ((255 - 0) / (y_max - y_min));
+        if (result_image[i] < 0) {
+            result_image[i] = 0;
+        }
+        if (result_image[i] > 255) {
+            result_image[i] = 255;
+        }
+    }
+    return result_image;
+}
+
+int* getParallelOperationsTBB(int* image, int height, int width,
+    int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int* result_image = new int[height * width];
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, height * width),
+        [&](const tbb::blocked_range<int>& range) {
+        for (int i = range.begin(); i < range.end(); i++) {
+            result_image[i] =
+                (image[i] - y_min) * ((255 - 0) / (y_max - y_min));
+            if (result_image[i] < 0) {
+                result_image[i] = 0;
+            }
+            if (result_image[i] > 255) {
+                result_image[i] = 255;
+            }
+        }
+    });
+    return result_image;
+}
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <tbb/tbb.h>
+#include <gtest/gtest.h>
+#include "./histogram_stretching.h"
+
+TEST(TBB_Histogram_Stretching, Image_is_empty) {
+    int height = 0;
+    int width = 0;
+    ASSERT_ANY_THROW(getRandomImage(height, width));
+}
+
+TEST(TBB_Histogram_Stretching, Image_5x5) {
+    int height = 5;
+    int width = 5;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_tbb = nullptr;
+    tbb::tick_count start_seq = tbb::tick_count::now();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_seq = tbb::tick_count::now();
+    double sequential_runtime = (end_seq - start_seq).seconds();
+    tbb::tick_count start_tbb = tbb::tick_count::now();
+    result_image_tbb = getParallelOperationsTBB(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_tbb = tbb::tick_count::now();
+    double parallel_tbb_runtime = (end_tbb - start_tbb).seconds();
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_tbb_runtime=" << parallel_tbb_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_tbb[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_tbb;
+}
+
+TEST(TBB_Histogram_Stretching, Image_7x10) {
+    int height = 7;
+    int width = 10;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_tbb = nullptr;
+    tbb::tick_count start_seq = tbb::tick_count::now();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_seq = tbb::tick_count::now();
+    double sequential_runtime = (end_seq - start_seq).seconds();
+    tbb::tick_count start_tbb = tbb::tick_count::now();
+    result_image_tbb = getParallelOperationsTBB(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_tbb = tbb::tick_count::now();
+    double parallel_tbb_runtime = (end_tbb - start_tbb).seconds();
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_tbb_runtime=" << parallel_tbb_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_tbb[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_tbb;
+}
+
+TEST(TBB_Histogram_Stretching, Image_10x15) {
+    int height = 10;
+    int width = 15;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_tbb = nullptr;
+    tbb::tick_count start_seq = tbb::tick_count::now();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_seq = tbb::tick_count::now();
+    double sequential_runtime = (end_seq - start_seq).seconds();
+    tbb::tick_count start_tbb = tbb::tick_count::now();
+    result_image_tbb = getParallelOperationsTBB(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_tbb = tbb::tick_count::now();
+    double parallel_tbb_runtime = (end_tbb - start_tbb).seconds();
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_tbb_runtime=" << parallel_tbb_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_tbb[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_tbb;
+}
+
+TEST(TBB_Histogram_Stretching, Image_40x20) {
+    int height = 40;
+    int width = 20;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_tbb = nullptr;
+    tbb::tick_count start_seq = tbb::tick_count::now();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_seq = tbb::tick_count::now();
+    double sequential_runtime = (end_seq - start_seq).seconds();
+    tbb::tick_count start_tbb = tbb::tick_count::now();
+    result_image_tbb = getParallelOperationsTBB(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_tbb = tbb::tick_count::now();
+    double parallel_tbb_runtime = (end_tbb - start_tbb).seconds();
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_tbb_runtime=" << parallel_tbb_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_tbb[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_tbb;
+}
+
+TEST(TBB_Histogram_Stretching, Image_50x50) {
+    int height = 50;
+    int width = 50;
+    int* image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    int* result_image_seq = nullptr;
+    int* result_image_tbb = nullptr;
+    tbb::tick_count start_seq = tbb::tick_count::now();
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_seq = tbb::tick_count::now();
+    double sequential_runtime = (end_seq - start_seq).seconds();
+    tbb::tick_count start_tbb = tbb::tick_count::now();
+    result_image_tbb = getParallelOperationsTBB(image, height, width,
+        y_max, y_min);
+    tbb::tick_count end_tbb = tbb::tick_count::now();
+    double parallel_tbb_runtime = (end_tbb - start_tbb).seconds();
+    std::cout << "sequential_runtime=" << sequential_runtime << std::endl;
+    std::cout << "parallel_tbb_runtime=" << parallel_tbb_runtime
+        << std::endl;
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_tbb[i]);
+    }
+    delete[] image;
+    delete[] result_image_seq;
+    delete[] result_image_tbb;
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    tbb::task_scheduler_init init(2);
+    return RUN_ALL_TESTS();
+}
+
+\end{lstlisting}
+
+\textbf{std::thread версия}
+\newline
+\newline histogram\_stretching.h
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#ifndef MODULES_TASK_4_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+#define MODULES_TASK_4_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+#include <vector>
+#include <iostream>
+
+std::vector<int> getRandomImage(int height, int width);
+int getYmax(std::vector<int> image, int height, int width);
+int getYmin(std::vector<int> image, int height, int width);
+std::vector<int> getSequentialOperations(std::vector<int> image,
+    int height, int width, int y_max, int y_min);
+std::vector<int> getParallelOperationsSTD(std::vector<int> image,
+    int height, int width, int y_max, int y_min);
+
+#endif  // MODULES_TASK_4_PREOBRAZHENSKAYA_Y_HISTOGRAM_STRETCHING_HISTOGRAM_STRETCHING_H_
+
+
+\end{lstlisting}
+histogram\_stretching.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <random>
+#include "../../../3rdparty/unapproved/unapproved.h"
+#include "../../../../task_4/preobrazhenskaya_y_histogram_stretching/histogram_stretching.h"
+
+std::vector<int> getRandomImage(int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::random_device dev;
+    std::mt19937 gen(dev());
+    std::vector<int> image(height * width);
+    for (int i = 0; i < height * width; i++) { image[i] = gen() % 256; }
+    return image;
+}
+
+int getYmax(std::vector<int> image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_max = 0;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] > y_max) {
+            y_max = image[i];
+        }
+    }
+    return y_max;
+}
+
+int getYmin(std::vector<int> image, int height, int width) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    int y_min = 255;
+    for (int i = 0; i < height * width; i++) {
+        if (image[i] < y_min) {
+            y_min = image[i];
+        }
+    }
+    return y_min;
+}
+
+std::vector<int> getSequentialOperations(std::vector<int> image,
+    int height, int width, int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::vector<int> result_image(height * width);
+    for (int i = 0; i < height * width; i++) {
+        result_image[i] = static_cast<int>
+            ((image[i] - y_min) * ((255 - 0) / (y_max - y_min)));
+        if (result_image[i] < 0) {
+            result_image[i] = 0;
+        }
+        if (result_image[i] > 255) {
+            result_image[i] = 255;
+        }
+    }
+    return result_image;
+}
+
+std::vector<int> getParallelOperationsSTD(std::vector<int> image,
+    int height, int width, int y_max, int y_min) {
+    if (height <= 0 || width <= 0) {
+        throw - 1;
+    }
+    std::vector<int> result_image(height * width);
+
+    const int threads_num = 6;
+    int delta = (height * width) / threads_num;
+    std::vector<std::thread> threads;
+    std::vector<int> parts(threads_num + 1);
+    for (int i = 0; i < threads_num; i++) {
+        parts[i] = i * delta;
+    }
+    parts[threads_num] = height * width;
+    for (int i = 0; i < threads_num; i++) {
+        std::thread t([&](const int i) {
+            for (int j = parts[i]; j < parts[i + 1]; j++) {
+                result_image[j] =
+                    static_cast<int>
+                    ((image[j] - y_min) * ((255 - 0) / (y_max - y_min)));
+                if (result_image[j] < 0) {
+                    result_image[j] = 0;
+                }
+                if (result_image[j] > 255) {
+                    result_image[j] = 255;
+                }
+            }
+        }, i);
+        threads.emplace_back(std::move(t));
+    }
+    for (int i = 0; i < threads_num; i++) {
+        if (threads[i].joinable()) {
+            threads[i].join();
+        }
+    }
+    return result_image;
+}
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Preobrazhenskaya Yuliya
+#include <gtest/gtest.h>
+#include "./histogram_stretching.h"
+
+TEST(STD_Histogram_Stretching, Image_is_empty) {
+    int height = 0;
+    int width = 0;
+    ASSERT_ANY_THROW(getRandomImage(height, width));
+}
+
+TEST(STD_Histogram_Stretching, Image_5x5) {
+    int height = 5;
+    int width = 5;
+    std::vector<int> image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    std::vector<int> result_image_seq(height, width);
+    std::vector<int> result_image_std(height, width);
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    result_image_std = getParallelOperationsSTD(image, height, width,
+        y_max, y_min);
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_std[i]);
+    }
+}
+
+TEST(STD_Histogram_Stretching, Image_7x10) {
+    int height = 7;
+    int width = 10;
+    std::vector<int> image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    std::vector<int> result_image_seq(height, width);
+    std::vector<int> result_image_std(height, width);
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    result_image_std = getParallelOperationsSTD(image, height, width,
+        y_max, y_min);
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_std[i]);
+    }
+}
+
+TEST(STD_Histogram_Stretching, Image_10x15) {
+    int height = 10;
+    int width = 15;
+    std::vector<int> image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    std::vector<int> result_image_seq(height, width);
+    std::vector<int> result_image_std(height, width);
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    result_image_std = getParallelOperationsSTD(image, height, width,
+        y_max, y_min);
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_std[i]);
+    }
+}
+
+TEST(STD_Histogram_Stretching, Image_40x20) {
+    int height = 40;
+    int width = 20;
+    std::vector<int> image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    std::vector<int> result_image_seq(height, width);
+    std::vector<int> result_image_std(height, width);
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    result_image_std = getParallelOperationsSTD(image, height, width,
+        y_max, y_min);
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_std[i]);
+    }
+}
+
+TEST(STD_Histogram_Stretching, Image_50x50) {
+    int height = 50;
+    int width = 50;
+    std::vector<int> image = getRandomImage(height, width);
+    int y_max = getYmax(image, height, width);
+    int y_min = getYmin(image, height, width);
+    std::vector<int> result_image_seq(height, width);
+    std::vector<int> result_image_std(height, width);
+    result_image_seq = getSequentialOperations(image, height, width,
+        y_max, y_min);
+    result_image_std = getParallelOperationsSTD(image, height, width,
+        y_max, y_min);
+    for (int i = 0; i < height * width; i++) {
+        ASSERT_EQ(result_image_seq[i], result_image_std[i]);
+    }
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+\end{lstlisting}
+
+\end{document}
